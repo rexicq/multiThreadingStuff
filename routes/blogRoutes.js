@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const requireLogin = require('../middlewares/requireLogin');
+const { clearHash } = require('../services/cache');
+const cleanHash = require('../middlewares/cleanCache');
 
 const Blog = mongoose.model('Blog');
 
@@ -14,12 +16,26 @@ module.exports = app => {
   });
 
   app.get('/api/blogs', requireLogin, async (req, res) => {
-    const blogs = await Blog.find({ _user: req.user.id });
+    /*const redis = require('redis');
+    const redisUrl = 'redis://127.0.0.1:6379';
+    const client = redis.createClient(redisUrl);
+    const util = require('util');
+    client.get = util.promisify(client.get);
+    const cachedBlogs = await client.get(req.user.id);
 
-    res.send(blogs);
+    if (cachedBlogs) {
+      console.log('SERVING FROM CASH');
+      return res.send(JSON.parse(cachedBlogs));
+    }*/
+
+    const blogs = await Blog
+      .find({ _user: req.user.id })
+      .cache({key: req.user.id});
+    res.send(blogs);/*
+    client.set(req.user.id, JSON.stringify(blogs));*/
   });
 
-  app.post('/api/blogs', requireLogin, async (req, res) => {
+  app.post('/api/blogs', requireLogin, cleanHash, async (req, res) => {
     const { title, content } = req.body;
 
     const blog = new Blog({
